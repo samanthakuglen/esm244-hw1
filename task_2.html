@@ -182,7 +182,7 @@ mdl1 &lt;- lm(f1, data = calcofi_data)
   
 f2 &lt;- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
 mdl2 &lt;- lm(f2, data = calcofi_data)</code></pre>
-<p>Using AICc to select the better model, considering the difference of AIC between the two models.</p>
+<p>Using AICc to select the better model, with a consideration the difference of AIC between the two models.</p>
 <pre class="r"><code>aic_table &lt;- AICcmodavg::aictab(list(mdl2, mdl1)) %&gt;% 
   rename(&quot;Model&quot; = &quot;Modnames&quot;)
 
@@ -274,6 +274,144 @@ Mod2
 </tbody>
 </table>
 <p>Model 1’s AICc is 616.605 while Model 2’s AICc 619.025, with a difference in AIC’s of 2.42.</p>
+</div>
+<div id="ten-fold-cross-validation-of-the-two-models" class="section level3">
+<h3>Ten-fold Cross Validation of the Two Models</h3>
+<p>Using root-mean-square error as the scoring method, with the final model trained on the full dataset.</p>
+<pre class="r"><code>folds &lt;- 10
+fold_vec &lt;- rep(1:folds, length.out = nrow(calcofi_data))
+
+set.seed(50)
+
+seawater_fold &lt;- calcofi_data %&gt;% 
+  mutate(group = sample(fold_vec, size = n(), replace = FALSE))
+
+# First fold
+test_df &lt;- seawater_fold %&gt;% 
+  filter(group == 1) 
+train_df &lt;- seawater_fold %&gt;% 
+  filter(group != 1)</code></pre>
+<p>Root-mean-square error, go in reverse order of these operations - find error (predicted actual), square it, find the average, then take the square root</p>
+<pre class="r"><code>calc_rmse &lt;- function(x, y) {
+  rmse_result &lt;- (x - y)^2 %&gt;%  mean() %&gt;%  sqrt()
+  return(rmse_result)
+}</code></pre>
+<p>Using the training dataset to create two linear regression models, based on the formulas above.</p>
+<pre class="r"><code>training_mdl1 &lt;- lm(f1, data = train_df)
+training_mdl2 &lt;- lm(f2, data = train_df)</code></pre>
+<p>Use the trained models to predict on test data</p>
+<pre class="r"><code>predict_test &lt;- test_df %&gt;% 
+  mutate(model1 = predict(training_mdl1, test_df),
+         model2 = predict(training_mdl2, test_df))
+
+rmse_predict_test &lt;- predict_test %&gt;% 
+  summarize(rmse_mdl1 = round(calc_rmse(model1, o2sat), digits = 3),
+            rmse_mdl2 = round(calc_rmse(model2, o2sat), digits = 3)) 
+
+kable(rmse_predict_test,
+      col = c(&quot;RMSE Mod 1&quot;,
+              &quot;RMSE Mod 2&quot;),
+      caption = &quot;Table 2: RMSE Values for Models 1 and 2&quot;) %&gt;% 
+  kable_styling(bootstrap_options = &quot;striped&quot;, 
+                full_width = FALSE)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Table 2: RMSE Values for Models 1 and 2
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+RMSE Mod 1
+</th>
+<th style="text-align:right;">
+RMSE Mod 2
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+5.895
+</td>
+<td style="text-align:right;">
+5.501
+</td>
+</tr>
+</tbody>
+</table>
+<p>Calculating over all folds and taking the average</p>
+<pre class="r"><code>rmse_df &lt;- data.frame()
+
+for(i in 1:folds) {
+  kfold_test_df &lt;- seawater_fold %&gt;% 
+    filter(group == i)
+  kfold_train_df &lt;- seawater_fold %&gt;% 
+    filter(group != i)
+  
+  kfold_mdl1 &lt;- lm(f1, data = kfold_train_df)
+  kfold_mdl2 &lt;- lm(f2, data = kfold_train_df)
+  
+  kfold_pred_df &lt;- kfold_test_df %&gt;% 
+    mutate(mdl1 = predict(kfold_mdl1, kfold_test_df),
+           mdl2 = predict(kfold_mdl2, .))
+  
+  kfold_rmse &lt;- kfold_pred_df %&gt;% 
+    summarize(rmse_mdl1 = calc_rmse(mdl1, o2sat),
+              rmse_mdl2 = calc_rmse(mdl2, o2sat))
+  
+  rmse_df &lt;- bind_rows(rmse_df, kfold_rmse)
+  
+}
+
+rmse_table &lt;- rmse_df %&gt;% 
+  summarize(mean_rmse_mdl1 = mean(rmse_mdl1),
+            mean_rmse_mdl2 = mean(rmse_mdl2)) 
+
+kable(rmse_table,
+      col = c(&quot;Mean RMSE Mod 1&quot;,
+                      &quot;Mean RMSE Mod 2&quot;),
+      caption = &quot;Table 3: Average RMSE Values for Models 1 and 2&quot;) %&gt;% 
+  kable_styling(bootstrap_options = &quot;striped&quot;, 
+                full_width = FALSE)</code></pre>
+<table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<caption>
+Table 3: Average RMSE Values for Models 1 and 2
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+Mean RMSE Mod 1
+</th>
+<th style="text-align:right;">
+Mean RMSE Mod 2
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+4.826589
+</td>
+<td style="text-align:right;">
+4.709636
+</td>
+</tr>
+</tbody>
+</table>
+<p>We find that Model 2 has a lower RMSE than Model 1, at a value of … vs … The 10 cross validation informs us that Model 2 has the best fit and predicts the observed values for oxygen saturation <code>o2sat</code> with the highest level of accuracy. Once we have chosen the model via cross validation, we train our final model on our entire dataset.</p>
+<pre class="r"><code>final_mdl &lt;- lm(f2, data = calcofi_data)</code></pre>
+<p>Our final model: <span class="math display">\[
+\begin{aligned}
+\operatorname{o2sat} &amp;= \alpha + \beta_{1}(\operatorname{t\_deg\_c}) + \beta_{2}(\operatorname{salinity}) + \beta_{3}(\operatorname{po4u\_m})\ + \\
+&amp;\quad \beta_{4}(\operatorname{depth\_m}) + \epsilon
+\end{aligned}
+\]</span></p>
+<p>Our final model with coefficients: <span class="math display">\[
+\begin{aligned}
+\operatorname{\widehat{o2sat}} &amp;= 144.07 - 0.75(\operatorname{t\_deg\_c}) - 0.44(\operatorname{salinity}) - 37.71(\operatorname{po4u\_m})\ - \\
+&amp;\quad 0.03(\operatorname{depth\_m})
+\end{aligned}
+\]</span></p>
 </div>
 
 
