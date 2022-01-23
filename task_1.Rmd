@@ -1,0 +1,64 @@
+---
+title: "Task 1: Data Wrangling & Visualization of Sierra Amphibians"
+author: "Samantha Kuglen"
+date: "1/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(here)
+library(lubridate)
+library(patchwork)
+```
+
+```{r}
+amphibian_data <- read_csv(here("data", "sierra_amphibians.csv"))
+```
+#  Find total number of mountain yellow-legged frogs by life stage and year, excluding Eggmass level observed in the entire study 
+```{r}
+total_yellow_frogs <- amphibian_data %>% 
+  filter(amphibian_species == "RAMU", amphibian_life_stage != "EggMass") %>% 
+  mutate(survey_date = mdy(survey_date), year = year(survey_date)) 
+
+plot1 <- ggplot(data = total_yellow_frogs, aes(x = year, group = amphibian_life_stage, fill = amphibian_life_stage)) +
+  geom_bar(position = "dodge") +
+  scale_fill_manual(values = c("red", "blue", "green")) +
+  labs(title = "Total Mountain Yellow-Legged Frogs Per Year",
+       x = "Count",
+       y = "Year",
+       fill = "Amphibian Life Stage")
+
+plot1 + scale_alpha(guide = "none") # suppress duplicate legend
+```
+
+# Col graph of total counts of yellow frogs in 5 lakes with greatest total counts
+# (At least 5 columns) with Lake ID as categorical label on one axis and total yellow-legged frog counts in the dataset on the other axis 
+
+```{r}
+top_5_lakes <- total_yellow_frogs %>% 
+  filter(amphibian_life_stage != "Tadpole") %>% 
+  group_by(lake_id) %>% 
+  summarize(total = sum(amphibian_number)) %>% 
+  slice_max(order_by = total, n = 5) 
+
+#as.character change to read as a string because the ID is a number
+
+top_5_lakes$lake_id <- sapply(top_5_lakes$lake_id, function(x) paste("Lake", x))
+top_5_lakes$lake_id <- fct_reorder(as.character(top_5_lakes$lake_id), top_5_lakes$total)
+
+plot2 <- ggplot(data = top_5_lakes, aes(y = lake_id, x = total)) + 
+  geom_col(color = "blue", fill = "blue") +
+  labs(title = "Top 5 Lakes With Greatest Mountain Yellow-Legged Frogs",
+       subtitle = "Adult and SubAdults (1995 - 2002)",
+       x = "Total Count", 
+       y = "Lake ID")
+```
+
+```{r}
+# Use patchwork package to place graphs on top of each other
+plot1 / plot2
+```
+

@@ -1,0 +1,44 @@
+---
+title: "Task 2: Model Selection of CalCOFI Seawater Sample Data "
+author: "Samantha Kuglen"
+date: "1/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(here)
+library(AICcmodavg)
+library(kableExtra)
+library(equatiomatic)
+
+```
+
+```{r}
+calcofi_data <- read_csv(here("data", "calcofi_seawater_samples.csv"))
+```
+
+### AIC Comparison of Two Linear Regression Models 
+**Model 1 (f1):** Oxygen saturation as a function of water temperature, salinity, and phosphate concentration. **Model 2 (f2):** Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.
+
+```{r}
+f1 <- o2sat ~ t_deg_c + salinity + po4u_m
+mdl1 <- lm(f1, data = calcofi_data)
+  
+f2 <- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
+mdl2 <- lm(f2, data = calcofi_data)
+```
+
+Using AICc to select the better model, considering the difference of AIC between the two models. 
+```{r}
+aic_table <- AICcmodavg::aictab(list(mdl2, mdl1)) %>% 
+  rename("Model" = "Modnames")
+
+kable(aic_table) %>% 
+  kable_styling(bootstrap_options = "striped", 
+                full_width = FALSE)
+```
+
+Model 1's AICc is `r round(aic_table[1, 3], 3)` while Model 2's AICc `r round(aic_table[2, 3], 3)`, with a difference in AIC's of `r round(aic_table[2, 3], 3) - round(aic_table[1, 3], 3)`. 
