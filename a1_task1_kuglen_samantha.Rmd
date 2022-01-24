@@ -1,0 +1,97 @@
+---
+title: "Task 1: Data Wrangling & Visualization of Sierra Amphibians"
+author: "Samantha Kuglen"
+date: "1/22/2022"
+output: html_document
+---
+### A. Overview
+This report provides an exploratory review of amphibian abundance data in the Sierra Lakes recorded from 1995 - 2002. The purpose fo this analysis is to wrangle and visualize data for mountain yellow-legged frogs (*Rana muscosa*). This data is important because it has supported research and management of Sierra Nevada aquatic ecosystems and their terrestrial interfaces. 
+
+### B. Data and Analysis
+
+This amphibian data contains observations physical characteristics of and surveyed aquatic communities for >8,000 lentic water bodies in the southern Sierra Nevada, including lakes, ponds, marshes, and meadows. The data was collected and made available by the [Sierra Lakes Inventory Project (SLIP)](https://portal.edirepository.org/nis/mapbrowse?packageid=edi.577.2). All analyses are in R version 4.0.2 using RStudio version 1.3.1056.
+
+```{r setup, include=TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# Attach packages
+library(tidyverse)
+library(here)
+library(lubridate)
+library(patchwork)
+library(paletteer)
+```
+
+```{r}
+# Read in the data
+amphibian_data <- read_csv(here("data", "sierra_amphibians.csv"))
+```
+
+#### I. Data Wrangling and Visualization I  
+Find total number of adult, subadult, and tadpole mountain yellow-legged frogs observed in the entire study by life stage and year, excluding Eggmass level, then store results for visualization. 
+```{r}
+# Filter for *Rana muscosa* species only, exclude EggMass and use `lubridate` package to retrieve year for grouping 
+total_yellow_frogs <- amphibian_data %>% 
+  filter(amphibian_species == "RAMU", amphibian_life_stage != "EggMass") %>% 
+  mutate(survey_date = mdy(survey_date), year = year(survey_date)) 
+
+# Visualize total counts across all water bodies, grouping by amphibian_life_stage 
+plot1 <- ggplot(data = total_yellow_frogs, aes(x = year, group = amphibian_life_stage, fill = amphibian_life_stage)) +
+  geom_bar(position = "dodge") + # separates counts
+  scale_fill_manual(values = c("#b6fc03", "#03a9fc", "#fc8803")) + 
+  labs(title = "Total Mountain Yellow-Legged Frogs Per Year",
+       subtitle = "Sierra Lakes (1995 - 2002)",
+       x = "Year",
+       y = "Count",
+       fill = "Amphibian Life Stage") +
+  theme_linedraw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"), # center title/subtitle
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.background = element_rect(fill = "#D3D3D3"),
+        legend.key = element_rect(fill = "black"),
+        legend.background = element_rect(fill = "#f5ebeb")) +
+  scale_x_continuous(breaks = c(1995:2002)) + # add breaks to show all years 
+  scale_fill_paletteer_d(palette = "colorBlindness::Blue2Gray8Steps") # colorblind-friendly palette
+
+plot1 + scale_alpha(guide = "none") # suppress duplicate legend
+```
+
+#### II. Data Wrangling and Visualization II
+Find the 5 lakes with greatest total counts of yellow frogs, with Lake ID as categorical label on the x-axis and total yellow-legged frog counts on the y-axis, then store results for visualization.
+
+```{r}
+top_5_lakes <- total_yellow_frogs %>% 
+  filter(amphibian_life_stage != "Tadpole") %>% 
+  group_by(lake_id) %>% 
+  summarize(total = sum(amphibian_number)) %>% 
+  slice_max(order_by = total, n = 5) 
+
+#as.character change to read as a string because the ID is a number
+
+top_5_lakes$lake_id <- sapply(top_5_lakes$lake_id, function(x) paste("Lake", x))
+top_5_lakes$lake_id <- fct_reorder(as.character(top_5_lakes$lake_id), top_5_lakes$total)
+
+plot2 <- ggplot(data = top_5_lakes, aes(y = lake_id, x = total), aes(fill = total)) + 
+  geom_col(aes(fill = lake_id)) +
+  labs(title = "Lakes With Greatest Adult and SubAdult Yellow-Legged Frogs",
+       subtitle = "Sierra Lakes (1995 - 2002)",
+       x = "Total Count", 
+       y = "Lake ID") +
+  theme_linedraw() + 
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"), # center title/subtitle
+        plot.subtitle = element_text(hjust = 0.5),
+        plot.background = element_rect(fill = "#D3D3D3"),
+        axis.title.y = element_text(margin = margin(r = 20)), # add space btwn y-axis label and graph
+        legend.position = 'none')  + # hide legend (unnecessary)
+    scale_fill_paletteer_d(palette = "colorBlindness::Green2Magenta16Steps") # colorblind-friendly palette
+
+```
+
+### C. Final Data Visualization
+Combine plots into a single compound figure
+```{r}
+# Use `patchwork` package syntax to place graphs on top of each other
+plot1 / plot2
+```
+
+**Figure 1.** 
