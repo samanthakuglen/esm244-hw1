@@ -168,18 +168,18 @@ pre code {
 
 <h1 class="title toc-ignore">Task 2: Model Selection of CalCOFI Seawater Sample Data</h1>
 <h4 class="author">Samantha Kuglen</h4>
-<h4 class="date">1/23/2022</h4>
+<h4 class="date">1/22/2022</h4>
 
 </div>
 
 
 <div id="a.-overview" class="section level3">
 <h3>A. Overview</h3>
-<p>This report provides an exploratory review on the relationship between O2 saturation of seawater off California’s coast and several physical and chemical variables. Specifically, we examine and compare (1) Oxygen saturation as a function of water temperature, salinity, and phosphate concentration and (2) Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.The purpose of this analysis is to determine which of the two models is more parsimonious, or in other words, provides predictive performance with simplicity and accuracy. This data is important because it provides important nutrient, salinity, and temperature information about the California Current System.</p>
+<p>This report provides an exploratory review on the relationship between O2 saturation of seawater off California’s coast and several physical and chemical variables. Specifically, we examine and compare model selection for (1) Oxygen saturation as a function of water temperature, salinity, and phosphate concentration and (2) Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.The purpose of this analysis is to determine which of the two models is more parsimonious, or in other words, provides predictive performance with simplicity and accuracy. This data is important because it provides important information about seawater in the California Current System that may influence or affect ecosystem processes.</p>
 </div>
 <div id="b.-data-and-analysis" class="section level3">
 <h3>B. Data and Analysis</h3>
-<p>The data contain observations from <a href="https://calcofi.org/ccdata.html">CalCOFI seawater sample data</a>. A 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations, along with nutrient analysis of silicate, nitrate and nitrite. An AIC comparison between the two models is used, to inform which model is a better fit, with preference for the model with lower AIC. Following AIC comparison of two linear regression models, a ten-fold cross validation is performed. The cross validation reserves a subset of data (test data) and trains our model using the rest (training data) to estimate the model parameters. All analyses are in R version 4.0.2 using RStudio version 1.3.1056.</p>
+<p>The data contain observations from <a href="https://calcofi.org/ccdata.html">CalCOFI seawater sample data</a>. A 70+ year hydrographic time-series includes temperature, salinity, oxygen and phosphate observations, along with nutrient analysis of silicate, nitrate and nitrite. An AIC corrected (AICc) comparison between the two models is used to inform which model is a better fit, with preference for the model with lower AICc. Following AICc comparison of two linear regression models, a ten-fold cross validation is performed. The cross validation reserves a subset of data (test data) and trains our model using the rest (training data) to estimate the model parameters. All analyses are in R version 4.0.2 using RStudio version 1.3.1056.</p>
 <pre class="r"><code>knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 # Attach packages
@@ -193,16 +193,18 @@ calcofi_data &lt;- read_csv(here(&quot;data&quot;, &quot;calcofi_seawater_sample
 </div>
 <div id="i.-aic-comparison-of-two-linear-regression-models" class="section level3">
 <h3>I. AIC Comparison of Two Linear Regression Models</h3>
-<p><strong>Model 1 (<code>mdl1</code>):</strong> Oxygen saturation as a function of water temperature, salinity, and phosphate concentration. <strong>Model 2 (<code>mdl2</code>):</strong> Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.</p>
-<pre class="r"><code>f1 &lt;- o2sat ~ t_deg_c + salinity + po4u_m
+<p><strong>Model 1:</strong> Oxygen saturation as a function of water temperature, salinity, and phosphate concentration. <strong>Model 2:</strong> Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth.</p>
+<pre class="r"><code># Model 1 linear model with defined parameters
+f1 &lt;- o2sat ~ t_deg_c + salinity + po4u_m
 mdl1 &lt;- lm(f1, data = calcofi_data)
-  
+
+# Model 2 linear model with defined parameters
 f2 &lt;- o2sat ~ t_deg_c + salinity + po4u_m + depth_m
 mdl2 &lt;- lm(f2, data = calcofi_data)</code></pre>
-<p>AICc is used to select the better model, with a consideration the difference of AIC between the two models.</p>
-<pre class="r"><code>aic_table &lt;- AICcmodavg::aictab(list(mdl1, mdl2)) %&gt;% 
-  rename(&quot;Model&quot; = &quot;Modnames&quot;) 
-
+<p>AICc is used to select the better model, with a consideration the difference of AICc between the two models.</p>
+<pre class="r"><code># Use `aictab` to compare the models 
+aic_table &lt;- AICcmodavg::aictab(list(mdl1, mdl2)) %&gt;% 
+  rename(&quot;Model&quot; = &quot;Modnames&quot;)
 
 kable(aic_table,
       caption = &quot;Table 1: Models 1 and 2 AIC corrected (AICc) Values&quot;) %&gt;% 
@@ -308,9 +310,11 @@ Mod1
 <div id="ii.-ten-fold-cross-validation-of-the-two-models" class="section level3">
 <h3>II. Ten-fold Cross Validation of the Two Models</h3>
 <p>Ten-fold cross validation is used with root-mean-square error (RMSE) as the scoring method and the final model is trained on the full dataset.</p>
-<pre class="r"><code>folds &lt;- 10
+<pre class="r"><code># Assign number of folds and create a folds vector
+folds &lt;- 10
 fold_vec &lt;- rep(1:folds, length.out = nrow(calcofi_data))
 
+# Starting number to generate sequence of random numbers
 set.seed(50)
 
 seawater_fold &lt;- calcofi_data %&gt;% 
@@ -322,18 +326,22 @@ test_df &lt;- seawater_fold %&gt;%
 train_df &lt;- seawater_fold %&gt;% 
   filter(group != 1)</code></pre>
 <p>RMSE goes in reverse order of these operations - find error (predicted actual), square it, find the average, then take the square root.</p>
-<pre class="r"><code>calc_rmse &lt;- function(x, y) {
+<pre class="r"><code># Calculate the RMSE value
+calc_rmse &lt;- function(x, y) {
   rmse_result &lt;- (x - y)^2 %&gt;%  mean() %&gt;%  sqrt()
   return(rmse_result)
 }</code></pre>
 <p>The training dataset is used to create two linear regression models, based on the formulas above.</p>
-<pre class="r"><code>training_mdl1 &lt;- lm(f1, data = train_df)
+<pre class="r"><code># Training dataset is based on fold 1
+training_mdl1 &lt;- lm(f1, data = train_df)
 training_mdl2 &lt;- lm(f2, data = train_df)</code></pre>
-<p>The trained models are used to predict on test data.</p>
-<pre class="r"><code>predict_test &lt;- test_df %&gt;% 
+<p>The trained models are then used to predict on test data.</p>
+<pre class="r"><code># Test data is all folds other than fold 1
+predict_test &lt;- test_df %&gt;% 
   mutate(model1 = predict(training_mdl1, test_df),
          model2 = predict(training_mdl2, test_df))
 
+# Calculate RMSE values
 rmse_predict_test &lt;- predict_test %&gt;% 
   summarize(rmse_mdl1 = round(calc_rmse(model1, o2sat), digits = 3),
             rmse_mdl2 = round(calc_rmse(model2, o2sat), digits = 3)) 
@@ -341,12 +349,12 @@ rmse_predict_test &lt;- predict_test %&gt;%
 kable(rmse_predict_test,
       col = c(&quot;RMSE Model 1&quot;,
               &quot;RMSE Model 2&quot;),
-      caption = &quot;Table 2: RMSE Values for Models 1 and 2&quot;) %&gt;% 
+      caption = &quot;Table 2: Test Data RMSE Values for Models 1 and 2&quot;) %&gt;% 
   kable_styling(bootstrap_options = &quot;striped&quot;, 
                 full_width = FALSE)</code></pre>
 <table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
 <caption>
-Table 2: RMSE Values for Models 1 and 2
+Table 2: Test Data RMSE Values for Models 1 and 2
 </caption>
 <thead>
 <tr>
@@ -369,9 +377,11 @@ RMSE Model 2
 </tr>
 </tbody>
 </table>
+<p>Comparison of RMSE values for Models 1 and 2 using the test dataframe with fold 1. RMSE for model 2 is lower, so it is preferred.</p>
 <p>Calculation over all folds and taking the average of RMSE values.</p>
 <pre class="r"><code>rmse_df &lt;- data.frame()
 
+# Iterate over all 10 folds to get RMSE values and store in a dataframe
 for(i in 1:folds) {
   kfold_test_df &lt;- seawater_fold %&gt;% 
     filter(group == i)
@@ -392,6 +402,7 @@ for(i in 1:folds) {
   rmse_df &lt;- bind_rows(rmse_df, kfold_rmse)
 }
 
+# Use the dataframe from above to calculate the mean RMSE values for each model
 rmse_table &lt;- rmse_df %&gt;% 
   summarize(mean_rmse_mdl1 = mean(rmse_mdl1),
             mean_rmse_mdl2 = mean(rmse_mdl2)) 
@@ -399,12 +410,12 @@ rmse_table &lt;- rmse_df %&gt;%
 kable(rmse_table,
       col = c(&quot;Mean RMSE Model 1&quot;,
                       &quot;Mean RMSE Model 2&quot;),
-      caption = &quot;Table 3: Average RMSE Values for Models 1 and 2&quot;) %&gt;% 
+      caption = &quot;Table 3: Average RMSE values for each model over all folds&quot;) %&gt;% 
   kable_styling(bootstrap_options = &quot;striped&quot;, 
                 full_width = FALSE)</code></pre>
 <table class="table table-striped" style="width: auto !important; margin-left: auto; margin-right: auto;">
 <caption>
-Table 3: Average RMSE Values for Models 1 and 2
+Table 3: Average RMSE values for each model over all folds
 </caption>
 <thead>
 <tr>
@@ -448,8 +459,8 @@ Mean RMSE Model 2
 <p>Data analysis reveals the following findings:</p>
 <ul>
 <li>Model 2’s AICc is lower than Model 1 and means that it is the preferred model and a better fit, based on AICc.</li>
-<li>Model 2 has a lower average RMSE than Model 1. The 10 cross validation informs us that Model 2 has the best fit and predicts the observed values for oxygen saturation <code>o2sat</code> with the most accuracy.</li>
-<li>Model 2: <em>Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth</em> is the most accurate model.</li>
+<li>Model 2 has a lower average RMSE than Model 1. The 10-fold cross validation informs us that Model 2 has the best fit and predicts the observed values for oxygen saturation <code>o2sat</code> with the most accuracy.</li>
+<li>Model 2: <em>Oxygen saturation as a function of water temp, salinity, phosphate concentration, and depth</em> is overall the most accurate model to inform our final parameterized model.</li>
 </ul>
 </div>
 <div id="data-citation" class="section level3">

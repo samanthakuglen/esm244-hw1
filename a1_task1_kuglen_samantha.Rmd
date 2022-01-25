@@ -1,11 +1,11 @@
 ---
-title: "Task 1: Data Wrangling & Visualization of Sierra Amphibians"
+title: "Task 1: Abundance Exploration of Sierra Amphibians"
 author: "Samantha Kuglen"
 date: "1/22/2022"
 output: html_document
 ---
 ### A. Overview
-This report provides an exploratory review of amphibian abundance data in the Sierra Lakes recorded from 1995 - 2002. The purpose fo this analysis is to wrangle and visualize data for mountain yellow-legged frogs (*Rana muscosa*). This data is important because it has supported research and management of Sierra Nevada aquatic ecosystems and their terrestrial interfaces. 
+This report provides an exploratory review of amphibian abundance data in the Sierra Lakes recorded from 1995 - 2002. The purpose of this analysis is to wrangle and visualize counts for mountain yellow-legged frogs (*Rana muscosa*). This data is important because it has supported research and management of Sierra Nevada aquatic ecosystems and their terrestrial interfaces. 
 
 ### B. Data and Analysis
 
@@ -27,18 +27,23 @@ library(paletteer)
 amphibian_data <- read_csv(here("data", "sierra_amphibians.csv"))
 ```
 
-#### I. Data Wrangling and Visualization I  
+### Data Wrangling and Visualization I  
 Find total number of adult, subadult, and tadpole mountain yellow-legged frogs observed in the entire study by life stage and year, excluding Eggmass level, then store results for visualization. 
 ```{r}
-# Filter for *Rana muscosa* species only, exclude EggMass and use `lubridate` package to retrieve year for grouping 
+# Filter for *Rana muscosa* species only, exclude EggMass and use `lubridate` package to retrieve year for grouping
 total_yellow_frogs <- amphibian_data %>% 
   filter(amphibian_species == "RAMU", amphibian_life_stage != "EggMass") %>% 
   mutate(survey_date = mdy(survey_date), year = year(survey_date)) 
 
+# Create a table to verify the counts that will be depicted in final plot
+frogs_count <- total_yellow_frogs %>% 
+  group_by(year, amphibian_life_stage) %>% 
+  summarize(amphib_count = n())
+
 # Visualize total counts across all water bodies, grouping by amphibian_life_stage 
-plot1 <- ggplot(data = total_yellow_frogs, aes(x = year, group = amphibian_life_stage, fill = amphibian_life_stage)) +
-  geom_bar(position = "dodge") + # separates counts
-  scale_fill_manual(values = c("#b6fc03", "#03a9fc", "#fc8803")) + 
+plot1 <- ggplot(data = total_yellow_frogs, 
+                aes(x = year, group = amphibian_life_stage, fill = amphibian_life_stage)) +
+  geom_bar(position = "dodge") + # separates counts 
   labs(title = "Total Mountain Yellow-Legged Frogs Per Year",
        subtitle = "Sierra Lakes (1995 - 2002)",
        x = "Year",
@@ -51,12 +56,11 @@ plot1 <- ggplot(data = total_yellow_frogs, aes(x = year, group = amphibian_life_
         legend.key = element_rect(fill = "black"),
         legend.background = element_rect(fill = "#f5ebeb")) +
   scale_x_continuous(breaks = c(1995:2002)) + # add breaks to show all years 
-  scale_fill_paletteer_d(palette = "colorBlindness::Blue2Gray8Steps") # colorblind-friendly palette
-
-plot1 + scale_alpha(guide = "none") # suppress duplicate legend
+  scale_fill_paletteer_d(palette = "colorBlindness::Blue2Gray8Steps") + # colorblind-friendly palette
+  scale_alpha(guide = "none") # suppress duplicate legend
 ```
 
-#### II. Data Wrangling and Visualization II
+### Data Wrangling and Visualization II
 Find the 5 lakes with greatest total counts of yellow frogs, with Lake ID as categorical label on the x-axis and total yellow-legged frog counts on the y-axis, then store results for visualization.
 
 ```{r}
@@ -94,7 +98,7 @@ Combine plots into a single compound figure
 plot1 / plot2
 ```
 
-**Figure 1.** 
+**Figure 1.** Counts and distributions of mountain yellow-legged frogs in the Sierra Lakes (*Rana muscosa*) from 1995 to 2002. Top: Counts of mountain yellow-legged frogs each year over all lakes, separated by amphibian life stage. Bottom: 5 Sierra Lakes with the greatest adult and sub-adult frog counts. Data: Knapp et al. (SLIP 2020). 
 
 ### Data Citation
 Knapp, R.A., C. Pavelka, E.E. Hegeman, and T.C. Smith. 2020. The Sierra Lakes Inventory Project: Non-Native fish and community composition of lakes and ponds in the Sierra Nevada, California ver 2. Environmental Data Initiative. https://doi.org/10.6073/pasta/d835832d7fd00d9e4466e44eea87fab3
